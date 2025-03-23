@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from ultralytics import YOLO
 import torch
 from safe import *
+from fall import *
 logging.basicConfig(
     filename="app.log",  # Log file name
     filemode="a",  # Append mode
@@ -51,6 +52,7 @@ except FileNotFoundError:
 app_insight = FaceAnalysis(name="buffalo_l", providers=['CPUExecutionProvider'])
 cig = torch.hub.load('ultralytics/yolov5', 'custom', path='weights.pt', source='github')
 model = YOLO("best.pt")  # Your trained model
+fall = YOLO('yolov8s.pt') # Fall detection model
 
 app_insight.prepare(ctx_id=-1, det_size=(640, 640))
 
@@ -152,6 +154,7 @@ async def chat_completions(request: dict):
                         
 
                     processed_img_path = "processed_image.jpg"
+                    frame = detect_fall(frame, fall)
                     cv2.imwrite(processed_img_path, frame)
 
                     # **Step 2: Run the CIG Model**
