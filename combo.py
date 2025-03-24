@@ -115,13 +115,14 @@ async def chat_completions(request: dict):
             try:
                 
                 image_data = base64.b64decode(base64_image)
+                print("hiiii")
                 image = Image.open(io.BytesIO(image_data))
                 frame = np.array(image)
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Convert to OpenCV BGR format
                 logging.info("Image received and processed: Shape = %s", frame.shape)                # see image for debugging
                 #save image in a dir
-                #file="img_test/image{}.jpg".format(time.time())
-                #cv2.imwrite(file, frame)
+                file="image{}.jpg".format(time.time())
+                cv2.imwrite(file, frame)
                 img_name=text_content
                 
                 
@@ -163,6 +164,7 @@ async def chat_completions(request: dict):
 
                     # **Step 3: Run YOLO Model**
                     final_image_path = process_image(processed_img_path, model)
+                    
 
                     # Convert final processed image to Base64
                     with open(final_image_path, "rb") as img_file:
