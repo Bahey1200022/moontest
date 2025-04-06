@@ -17,9 +17,8 @@ import torch
 from safe2 import *
 from match import *
 from datetime import date
-
+from pymongo import MongoClient
 # Global dictionary to store daily data
-daily_data = {}
 
 logging.basicConfig(
     filename="app.log",  # Log file name
@@ -37,6 +36,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+client = MongoClient("mongodb+srv://bahey6224:skarpt@atlascluster.x07b3pp.mongodb.net/?retryWrites=true&w=majority&appName=AtlasCluster")
+# Send a ping to confirm a successful connection
+try:
+    client.admin.command('ping')
+    print("Pinged your deployment. You successfully connected to MongoDB!")
+except Exception as e:
+    print(e)
 # Load known faces
 try:
     with open("known_faces.pkl", "rb") as f:
