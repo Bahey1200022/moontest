@@ -19,7 +19,6 @@ def process_image(image_path, models):
     _, encoded_img = cv2.imencode('.jpg', image, encode_param)
     image = cv2.imdecode(encoded_img, cv2.IMREAD_UNCHANGED)
     
-
     # Run inference
     results = models.predict(image)
 
@@ -35,6 +34,7 @@ def process_image(image_path, models):
 
     # Store individual detected bounding boxes with averages
     detected_instances = []
+    instance_count = {}
 
     # Process results
     for result in results:
@@ -46,26 +46,33 @@ def process_image(image_path, models):
 
             # Compute bounding box average
             bbox_avg = int(np.mean([x1, y1, x2, y2]))
+            if label in ["machinery", "vehicle", "Safety Cone", "Mask", "NO-Mask","Person"]:
+                continue
 
             # Store individual bounding box instance
             detected_instances.append({
                 "class": label,
                 "bounding_box_avg": bbox_avg,
-                # "bbox": [x1, y1, x2, y2],  # Optional: Keep the actual bounding box values
-                # "confidence": round(confidence, 2)
             })
+
+            # Count instances
+            instance_count[label] = instance_count.get(label, 0) + 1
 
             # Define colors for bounding boxes
             colors = {
                 "NO-Hardhat": (0, 255, 0),
                 "NO-Safety Vest": (0, 0, 255),
                 "Safety Vest": (255, 0, 255),
-                "Hardhat": (0, 0, 0)
+                "Hardhat": (0, 0, 0),
+                "Person": (255, 0, 0)
             }
             color = colors.get(label, (128, 128, 128))
 
             # Skip drawing bounding boxes for certain labels
-            if label in ["Person", "machinery", "vehicle", "Safety Cone", "Mask", "NO-Mask"]:
+            if label in ["machinery", "vehicle", "Safety Cone", "Mask", "NO-Mask", "Person"]:
+                continue 
+            
+            if confidence < 0.5:
                 continue
 
             # Draw bounding box and label
@@ -74,7 +81,15 @@ def process_image(image_path, models):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
     # Save the processed image
-    output_path = "resultss.jpg"
+    output_path = "resultss1.jpg"
     cv2.imwrite(output_path, image)
+
+    # Print instance count
+    print("\nDetected instances and their count:")
+    for label, count in instance_count.items():
+        if label in ["machinery", "vehicle", "Safety Cone", "Mask", "NO-Mask","Person"]:
+                continue 
+
+        print(f"{label}: {count}")
 
     return detected_instances, output_path
