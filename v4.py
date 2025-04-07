@@ -18,6 +18,8 @@ from safe2 import *
 from match import *
 from datetime import date
 from pymongo import MongoClient
+
+from time_table import calc_time
 # Global dictionary to store daily data
 
 logging.basicConfig(
@@ -47,6 +49,7 @@ try:
 
     # Step 3: Select your collection (like a table)
     collection = db["test_collection"]
+    calc_collection = db["calc_collection"]
 except Exception as e:
     print(e)
     
@@ -191,6 +194,8 @@ async def chat_completions(request: dict):
                         foot = (int((x1 + x2) / 2), int(y2))
                         in_zone = is_in_polygon(foot, workstation_zone)
                         inzone_names.append(name) if in_zone else None
+                        known_names = list(known_faces.keys())
+                        calc_time(inzone_names, calc_collection,known_names)
 
                         # If the name is "Unknown", make it unique
                         if name == "Unknown":
