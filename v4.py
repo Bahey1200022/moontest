@@ -22,13 +22,6 @@ from pymongo import MongoClient
 from time_table import calc_time
 # Global dictionary to store daily data
 
-logging.basicConfig(
-    filename="app.log",  # Log file name
-    filemode="a",  # Append mode
-    format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
-    level=logging.INFO  # Log level
-)
-logging.info("Starting application...")
 
 app = FastAPI()
 app.add_middleware(
@@ -118,7 +111,6 @@ async def chat_completions(request: dict):
     Expects JSON with a base64-encoded image and optional text messages.
     """
     try:
-        logging.info(f"Received request: {request}")
         # Ensure request format follows OpenAI style
         if "model" not in request or "messages" not in request:
             raise HTTPException(status_code=400, detail="Invalid OpenAI API format")
@@ -140,7 +132,6 @@ async def chat_completions(request: dict):
                             
                             if image_url.startswith("data:image/"):
                                 base64_image = image_url.split(",")[1]  # Extract base64 data
-                                logging.info(f"Extracted base64 image: {base64_image[:100]}...")  # Log first 100 chars
                                 break
 
         recognized_names = []
@@ -157,7 +148,6 @@ async def chat_completions(request: dict):
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Convert to OpenCV BGR format
                 
 
-                logging.info("Image received and processed: Shape = %s", frame.shape)                # see image for debugging
                 #save image in a dir
                 # file="image{}.jpg".format(time.time())
                 # cv2.imwrite(file, frame)
@@ -208,13 +198,13 @@ async def chat_completions(request: dict):
                         recognized_names.append(name)  # Update recognized names list
                         face_boxes.append(bbox)  # Update face boxes list
 
-                    print(f"Recognized faces: {recognized_names}")
+                    # print(f"Recognized faces: {recognized_names}")
 
                     # Compute and store average bounding box per unique face
                     for name, box in face_data.items():
                         overall_avg[name] = int(np.mean(box))  # Compute average of (x1, y1, x2, y2)
 
-                    print("Overall Averages:", overall_avg)
+                    # print("Overall Averages:", overall_avg)
 
                     # Draw bounding boxes with corresponding names
                     for name, box in face_data.items():  # Use updated data
@@ -253,7 +243,7 @@ async def chat_completions(request: dict):
                         #             cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
                         # print("Bounding Box:", res)
                         cigs.append(avg_bb)
-                    print("Cigs:", cigs)
+                    # print("Cigs:", cigs)
                     
 
                     # **Step 3: Run YOLO Model**
@@ -367,15 +357,41 @@ def get_uniform_stats(date: str = Query(..., example="2025-04-07")):
         # Return the uniform dictionary
         return uniform
         
-      
-        
-
-     
-        
+    
 
     except ValueError:
         return {"error": "Invalid date format. Use YYYY-MM-DD."}
 
+
+
+
+
+
+@app.post("/api/get_tables_per_date")
+def get_uniform_stats(date: str = Query(..., example="2025-04-07")):
+    try:
+        date_obj = datetime.strptime(date, "%Y-%m-%d").date().isoformat()
+        time_table={}
+        # Find all records for that date
+        records = list(calc_collection.find({"date": date_obj}))
+        for record in records:
+            name = record.get("name", "Unknown")
+            total_frames = record.get("total_frames", 0)
+            detected_frames = record.get("detected_frames", 0)
+
+         
+            #### frame each 3 seconds 
+            tot_time=(3*total_frames)/60  ## minutes
+            det_time=(3*detected_frames)/60 ## minutes
+            off_time=tot_time-det_time
+            time_table.update({name: {"total_time": tot_time, "detected_time": det_time, "off_time": off_time}})
+        return time_table
+        
+    
+
+    except ValueError:
+        return {"error": "Invalid date format. Use YYYY-MM-DD."}
+    
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
