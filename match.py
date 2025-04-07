@@ -1,3 +1,4 @@
+from datetime import datetime
 from scipy.spatial import distance
 
 def map_safety_to_overall(avg_safety, overall_avg):
@@ -27,13 +28,22 @@ def map_safety_to_overall(avg_safety, overall_avg):
     return safety_mappings
 
 
-def display_mappings(mappings):
+def display_mappings(mappings,collections):
     for unknown, data in mappings.items():
         print(f"- {unknown}")
         print(f"  - Bounding Box Avg: **{data['bounding_box_avg']}**")
         for key, value in data['safety_info'].items():
             print(f"  - {key}: {value}")
         print(f"  - Uniform: {data['uniform']}\n")
+        date_str = data.get("date", datetime.today().strftime("%Y-%m-%d"))
+        try:
+            if unknown.lower().startswith("unknown"):
+                print(f"Skipping {unknown}")
+                continue   
+            update_appearance(unknown, date_str, data["uniform"], collections)
+        except Exception as e:
+            print(f"Error calling update_appearance for {unknown}: {e}")
+        
 
 
 
@@ -51,3 +61,25 @@ def map_cigs_to_person(cigs, overall_avg):
         mapped_cigs.append((cig, closest_person))
 
     return mapped_cigs
+
+
+
+
+def update_appearance(name, date_str, uniform,collections):
+    # Convert date to a consistent format (optional, ISO string)
+    date = datetime.strptime(date_str, "%Y-%m-%d").date().isoformat()
+    update_fields = {
+        "$inc": {"total_appearances": 1}
+    }
+
+    if uniform.lower() == "yes":
+        update_fields["$inc"]["detected_appearances"] = 1
+
+    collections.update_one(
+        {"name": name, "date": date},
+        update_fields,
+        upsert=True
+    )
+    
+    
+    

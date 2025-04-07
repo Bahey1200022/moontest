@@ -1,5 +1,5 @@
 import time
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 import cv2
 import numpy as np
@@ -38,11 +38,20 @@ app.add_middleware(
 )
 client = MongoClient("mongodb+srv://bahey6224:skarpt@atlascluster.x07b3pp.mongodb.net/?retryWrites=true&w=majority&appName=AtlasCluster")
 # Send a ping to confirm a successful connection
+
 try:
     client.admin.command('ping')
     print("Pinged your deployment. You successfully connected to MongoDB!")
+        # Step 2: Select your database
+    db = client["test_db"]
+
+    # Step 3: Select your collection (like a table)
+    collection = db["test_collection"]
 except Exception as e:
     print(e)
+    
+
+    
 # Load known faces
 try:
     with open("known_faces.pkl", "rb") as f:
@@ -198,7 +207,7 @@ async def chat_completions(request: dict):
 
                     # **Step 2: Run the CIG Model**
                     results = cig(processed_img_path)
-                    results.show()  # Display results
+                    # results.show()  # Display results
                     # results.show()  # Display results
                     bounding_boxes = results.pandas().xyxy[0][['xmin', 'ymin', 'xmax', 'ymax', 'confidence', 'name']].to_dict(orient='records')
                     
@@ -225,7 +234,7 @@ async def chat_completions(request: dict):
                     cig_mapping=map_cigs_to_person(cigs, overall_avg)
                     print("Cig Mappings:", cig_mapping)
                     mappings=map_safety_to_overall(avg_safety, overall_avg)
-                    display_mappings(mappings)
+                    display_mappings(mappings,collection)
                     
                     
 
@@ -306,8 +315,38 @@ async def add_face(name: str = Form(...), image: UploadFile = File(...)):
         return {"error": str(e)}
 
 
+@app.post("/api/get_uniform_per_date")
+def get_uniform_stats(date: str = Query(..., example="2025-04-07")):
+    try:
+        # Parse date to ensure valid format
+        date_obj = datetime.strptime(date, "%Y-%m-%d").date().isoformat()
+        uniform={}
 
+        # Find all records for that date
+        records = list(collection.find({"date": date_obj}))
 
+        total = sum(doc.get("total_appearances", 0) for doc in records)
+        detected = sum(doc.get("detected_appearances", 0) for doc in records)
+        for doc in records:
+            detected = doc.get("detected_appearances", 0)
+            total = doc.get("total_appearances", 0)
+            ratio = round(detected / total, 2) if total else 0
+            print(f"Name: {doc['name']}, Detected: {detected}, Total: {total}, Ratio: {ratio}")
+            if ratio >= 0.4:
+                uniform.update({doc['name']: "Yes"})
+            else:
+                uniform.update({doc['name']: "No"})
+        # Return the uniform dictionary
+        return uniform
+        
+      
+        
+
+     
+        
+
+    except ValueError:
+        return {"error": "Invalid date format. Use YYYY-MM-DD."}
 
 
 if __name__ == "__main__":
