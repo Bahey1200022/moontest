@@ -51,13 +51,10 @@ def is_in_polygon(point, polygon):
     return cv2.pointPolygonTest(polygon, (px, py), False) >= 0
 # === Define your workstation polygon here ===
 workstation_zone = np.array([
-    [5, 710],
-    [10, 80],
-    [300, 70],
-    [560, 90],
-    [800, 150],
-    [1180, 180],
-    [1200, 700],
+    [100, 100],   # Top-left
+    [600, 100],  # Top-right
+    [700, 600],  # Bottom-right
+    [100, 600]    # Bottom-left
 ], dtype=np.int32)
 
     
