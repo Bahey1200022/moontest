@@ -330,61 +330,55 @@ async def add_face(name: str = Form(...), image: UploadFile = File(...)):
         return {"error": str(e)}
 
 
-@app.post("/api/get_uniform_per_date")
+@app.get("/api/get_uniform_per_date")
 def get_uniform_stats(date: str = Query(..., example="2025-04-07")):
     try:
         # Parse date to ensure valid format
         date_obj = datetime.strptime(date, "%Y-%m-%d").date().isoformat()
-        uniform={}
+        uniform = {}
 
         # Find all records for that date
         records = list(collection.find({"date": date_obj}))
 
-        total = sum(doc.get("total_appearances", 0) for doc in records)
-        detected = sum(doc.get("detected_appearances", 0) for doc in records)
         for doc in records:
             detected = doc.get("detected_appearances", 0)
             total = doc.get("total_appearances", 0)
             ratio = round(detected / total, 2) if total else 0
             print(f"Name: {doc['name']}, Detected: {detected}, Total: {total}, Ratio: {ratio}")
-            if ratio >= 0.4:
-                uniform.update({doc['name']: "Yes"})
-            else:
-                uniform.update({doc['name']: "No"})
-        # Return the uniform dictionary
+            uniform[doc['name']] = "Yes" if ratio >= 0.4 else "No"
+
         return uniform
-        
-    
 
     except ValueError:
         return {"error": "Invalid date format. Use YYYY-MM-DD."}
 
 
-
-
-
-
-@app.post("/api/get_tables_per_date")
-def get_uniform_stats(date: str = Query(..., example="2025-04-07")):
+@app.get("/api/get_tables_per_date")
+def get_tables_stats(date: str = Query(..., example="2025-04-07")):
     try:
         date_obj = datetime.strptime(date, "%Y-%m-%d").date().isoformat()
-        time_table={}
+        time_table = {}
+
         # Find all records for that date
         records = list(calc_collection.find({"date": date_obj}))
+
         for record in records:
             name = record.get("name", "Unknown")
             total_frames = record.get("total_frames", 0)
             detected_frames = record.get("detected_frames", 0)
 
-         
-            #### frame each 3 seconds 
-            tot_time=(3*total_frames)/60  ## minutes
-            det_time=(3*detected_frames)/60 ## minutes
-            off_time=tot_time-det_time
-            time_table.update({name: {"total_time": tot_time, "detected_time": det_time, "off_time": off_time}})
+            # frame every 3 seconds
+            tot_time = (3 * total_frames) / 60  # in minutes
+            det_time = (3 * detected_frames) / 60  # in minutes
+            off_time = tot_time - det_time
+
+            time_table[name] = {
+                "total_time": round(tot_time, 2),
+                "detected_time": round(det_time, 2),
+                "off_time": round(off_time, 2),
+            }
+
         return time_table
-        
-    
 
     except ValueError:
         return {"error": "Invalid date format. Use YYYY-MM-DD."}
