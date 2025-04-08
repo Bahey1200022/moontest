@@ -1,3 +1,4 @@
+import json
 import time
 import cv2
 import numpy as np
@@ -13,10 +14,15 @@ from safe2 import *
 from match import *
 from datetime import date
 from pymongo import MongoClient
-
+import requests
 from time_table import calc_time
 
-
+home_assistant_url = "http://homeassistant.local:8123/api/states/sensor.face_recognition"
+access_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIyZjJmYjU1MDNjY2E0MTAxYTJkNDY5ZGM5MjQ4NzZiZiIsImlhdCI6MTc0NDExNDkyMiwiZXhwIjoyMDU5NDc0OTIyfQ.lqouYGvta5yAePjdy6vgLYYIlcprIK-cf1baDI5QcGc"  # Replace with yours
+headers = {
+    "Authorization": f"Bearer {access_token}",
+    "Content-Type": "application/json",
+}
 client = MongoClient("mongodb+srv://bahey6224:skarpt@atlascluster.x07b3pp.mongodb.net/?retryWrites=true&w=majority&appName=AtlasCluster")
 # Send a ping to confirm a successful connection
 
@@ -76,7 +82,7 @@ def recognize_face(face_embedding, threshold=0.17):
 
 while True:
     start=time.time()
-    image= cv2.imread("test.jpg")
+    image= cv2.imread("screenshots/image1743930652.jpg")
     frame = np.array(image)
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Convert to OpenCV BGR format
     
@@ -175,12 +181,30 @@ while True:
         # Convert final processed image to Base64
         with open(final_image_path, "rb") as img_file:
             processed_image_base64 = base64.b64encode(img_file.read()).decode("utf-8")
-
-            
-            
+        response = {
+        "recognized_names": recognized_names,
+        "image_base64": processed_image_base64
+    }
+        json_response = json.dumps(response)
+                
+        data = {
+            "state": ", ".join(response["recognized_names"]),  # example: "Alice, Bob"
+            "attributes": {
+                "image_base64": response["image_base64"]
+            }
+        }
 
         
     else:
         recognized_names = ["No face detected"]
+        data = {
+            "state": ", ".join(recognized_names),
+            
+        }
+    r = requests.post(home_assistant_url, headers=headers, json=data)
+    print(r.status_code)
+    print(r.json())
     end=time.time()
+    #send img in json 
+    
     print(f"Time taken: {end-start}")
