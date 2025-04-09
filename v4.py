@@ -1,7 +1,11 @@
+import os
+import tempfile
 import time
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 import cv2
+from fastapi.templating import Jinja2Templates
+from fpdf import FPDF
 import numpy as np
 import io
 import base64
@@ -33,7 +37,7 @@ app.add_middleware(
 )
 client = MongoClient("mongodb+srv://bahey6224:skarpt@atlascluster.x07b3pp.mongodb.net/?retryWrites=true&w=majority&appName=AtlasCluster")
 # Send a ping to confirm a successful connection
-
+templates = Jinja2Templates(directory="templates")  
 try:
     client.admin.command('ping')
     print("Pinged your deployment. You successfully connected to MongoDB!")
@@ -94,6 +98,12 @@ def recognize_face(face_embedding, threshold=0.17):
             best_score = score
         print(f"Face match: {name} - Score: {score}")    
     return best_match
+
+
+@app.get("/", response_class=HTMLResponse)
+async def get_date_picker(request: Request):
+    return templates.TemplateResponse("date_picker.html", {"request": request})
+
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: dict):
@@ -230,15 +240,7 @@ async def chat_completions(request: dict):
                     for res in bounding_boxes:
                         # get average of coordinates of each bb
                         avg_bb = (res['xmin'] + res['xmax'] + res['ymin'] + res['ymax']) / 4
-                        # # draw bounding box
-                        # x1, y1, x2, y2 = int(res['xmin']), int(res['ymin']), int(res['xmax']), int(res['ymax'])
-                        # label = res['name']
-                        # confidence = res['confidence']
-                        # color = (0, 255, 0)  # Green color for bounding box
-                        # cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                        # cv2.putText(frame, f"{label} ({confidence:.2f})", (x1, y1 - 10),
-                        #             cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-                        # print("Bounding Box:", res)
+                       
                         cigs.append(avg_bb)
                     # print("Cigs:", cigs)
                     
@@ -330,46 +332,24 @@ async def add_face(name: str = Form(...), image: UploadFile = File(...)):
         return {"error": str(e)}
 
 
-@app.get("/api/get_uniform_per_date")
-def get_uniform_stats(date: str = Query(..., example="2025-04-07")):
-    try:
-        # Parse date to ensure valid format
-        date_obj = datetime.strptime(date, "%Y-%m-%d").date().isoformat()
-        uniform = {}
-
-        # Find all records for that date
-        records = list(collection.find({"date": date_obj}))
-
-        for doc in records:
-            detected = doc.get("detected_appearances", 0)
-            total = doc.get("total_appearances", 0)
-            ratio = round(detected / total, 2) if total else 0
-            print(f"Name: {doc['name']}, Detected: {detected}, Total: {total}, Ratio: {ratio}")
-            uniform[doc['name']] = "Yes" if ratio >= 0.4 else "No"
-
-        return uniform
-
-    except ValueError:
-        return {"error": "Invalid date format. Use YYYY-MM-DD."}
 
 
 @app.get("/api/get_tables_per_date")
-def get_tables_stats(date: str = Query(..., example="2025-04-07")):
+async def get_tables_stats(date: str = Query(None, example="2025-04-07")):
     try:
+        if not date:
+            date = datetime.today().strftime("%Y-%m-%d")
         date_obj = datetime.strptime(date, "%Y-%m-%d").date().isoformat()
-        time_table = {}
 
-        # Find all records for that date
+        # Collect table stats
         records = list(calc_collection.find({"date": date_obj}))
-
+        time_table = {}
         for record in records:
             name = record.get("name", "Unknown")
             total_frames = record.get("total_frames", 0)
             detected_frames = record.get("detected_frames", 0)
-
-            # frame every 3 seconds
-            tot_time = (3 * total_frames) / 60  # in minutes
-            det_time = (3 * detected_frames) / 60  # in minutes
+            tot_time = (3 * total_frames) / 60
+            det_time = (3 * detected_frames) / 60
             off_time = tot_time - det_time
 
             time_table[name] = {
@@ -378,11 +358,58 @@ def get_tables_stats(date: str = Query(..., example="2025-04-07")):
                 "off_time": round(off_time, 2),
             }
 
-        return time_table
+        # Get uniform data from another collection
+        uniform_stats = {}
+        uniform_records = list(collection.find({"date": date_obj}))
+        for doc in uniform_records:
+            detected = doc.get("detected_appearances", 0)
+            total = doc.get("total_appearances", 0)
+            ratio = round(detected / total, 2) if total else 0
+            uniform_stats[doc['name']] = "Yes" if ratio >= 0.4 else "No"
+
+        # Generate PDF
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+
+        # Title
+        pdf.cell(200, 10, txt=f"Table Statistics for {date_obj}", ln=1, align="C")
+
+        # Table Header
+        pdf.cell(50, 10, txt="Name", border=1)
+        pdf.cell(30, 10, txt="Total Time", border=1)
+        pdf.cell(30, 10, txt="work Time", border=1)
+        pdf.cell(30, 10, txt="Off Time", border=1)
+        pdf.cell(30, 10, txt="Uniform", border=1)
+        pdf.ln()
+
+        # Table Rows
+        for name, stats in time_table.items():
+            uniform_status = uniform_stats.get(name, "_")
+            pdf.cell(50, 10, txt=name, border=1)
+            pdf.cell(30, 10, txt=str(stats["total_time"]), border=1)
+            pdf.cell(30, 10, txt=str(stats["detected_time"]), border=1)
+            pdf.cell(30, 10, txt=str(stats["off_time"]), border=1)
+            pdf.cell(30, 10, txt=uniform_status, border=1)
+            pdf.ln()
+
+        # Save to temporary file
+        temp_dir = tempfile.gettempdir()
+        pdf_path = os.path.join(temp_dir, f"tables_{date_obj}.pdf")
+        pdf.output(pdf_path)
+
+        # Return PDF
+        return FileResponse(
+            pdf_path,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=tables_report_{date_obj}.pdf"}
+        )
 
     except ValueError:
-        return {"error": "Invalid date format. Use YYYY-MM-DD."}
-    
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid date format. Use YYYY-MM-DD."}
+        )
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -20,8 +20,8 @@ from time_table import calc_time
 home_assistant_url = "http://homeassistant.local:8123/api/states/sensor.face_recognition"
 access_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIyZjJmYjU1MDNjY2E0MTAxYTJkNDY5ZGM5MjQ4NzZiZiIsImlhdCI6MTc0NDExNDkyMiwiZXhwIjoyMDU5NDc0OTIyfQ.lqouYGvta5yAePjdy6vgLYYIlcprIK-cf1baDI5QcGc"  # Replace with yours
 headers = {
-    "Authorization": f"Bearer {access_token}",
-    "Content-Type": "application/json",
+    'Content-Disposition': 'attachment; filename="tables_report.pdf"',
+    'Content-Type': 'application/pdf'
 }
 client = MongoClient("mongodb+srv://bahey6224:skarpt@atlascluster.x07b3pp.mongodb.net/?retryWrites=true&w=majority&appName=AtlasCluster")
 # Send a ping to confirm a successful connection
