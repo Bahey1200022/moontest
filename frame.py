@@ -1,4 +1,5 @@
 import json
+import os
 import time
 import cv2
 import numpy as np
@@ -10,6 +11,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 import pickle
 from ultralytics import YOLO
 import torch
+from mail import send_email
+from pdf_report import generate_todays_pdf_report
 from safe2 import *
 from match import *
 from datetime import date
@@ -208,3 +211,50 @@ while True:
     #send img in json 
     
     print(f"Time taken: {end-start}")
+    
+        
+    # Get the current local time
+    now = datetime.now()
+
+    # Check if the current time is 6 PM (18:00)
+    is_six_pm = now.hour == 18 and now.minute == 0
+
+    # Check if today is neither Friday (4) nor Saturday (5)
+    # weekday() returns 0 for Monday, 1 for Tuesday, ..., 6 for Sunday
+    is_not_friday_or_saturday = now.weekday() not in [4, 5]
+    
+    if is_six_pm and is_not_friday_or_saturday:
+        # generate and send mail
+        pdf_path = generate_todays_pdf_report(calc_collection, collection)
+        if pdf_path:
+            # send mail
+            email_subject = f"Daily Table Statistics Report - {datetime.today().date().isoformat()}"
+            email_body = """Hello,
+
+                    Please find attached the daily table statistics report.
+
+                    Best regards,
+                    Your Monitoring System
+                    """
+            sender_email = "bahy2002@gmail.com"
+            recipient_emails = ["Omerghitas@gmail.com"]  # List of recipients
+            email_password = "utqx qvvh ebea vuxx"  # Use app-specific password for Gmail
+    
+            send_email(
+                subject=email_subject,
+                body=email_body,
+                sender=sender_email,
+                recipients=recipient_emails,
+                password=email_password,
+                attachment_path=pdf_path
+            )
+            
+            # Optional: Delete the temporary PDF file after sending
+            try:
+                os.remove(pdf_path)
+                print(f"Temporary file {pdf_path} deleted")
+            except Exception as e:
+                print(f"Error deleting temporary file: {e}")
+        else:
+            print("Failed to generate PDF report - no email sent")
+         
